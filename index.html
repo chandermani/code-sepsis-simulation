@@ -135,6 +135,11 @@
   .minhand{transform-origin:0 0;animation:spin 60s linear infinite}
   .hrhand{transform-origin:0 0;animation:spin 720s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* Respect the device's Reduce Motion setting: keep expressions and text, drop movement. */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+    .alarm.on{opacity:1}
+  }
   /* iPad / wide screens */
   @media (min-width:900px){
     .wrap{max-width:1180px}
