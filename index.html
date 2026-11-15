@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Code Sepsis">
+<meta name="theme-color" content="#0b1014">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Code Sepsis: Urosepsis Simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1014; --panel:#121a20; --panel2:#18232b; --line:#24323c;
+    --text:#e6edf2; --muted:#8a9ba8; --green:#3ddc84; --amber:#ffb547; --red:#ff5a5f;
+    --blue:#5ab0ff; --cyan:#4fe3d6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+  html,body{overscroll-behavior:none}
+  button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .topbar{top:env(safe-area-inset-top)}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  h1{font-size:28px;margin:8px 0 4px;letter-spacing:-.5px}
+  h2{font-size:19px;margin:0 0 8px}
+  p{line-height:1.55;margin:0 0 12px}
+  .muted{color:var(--muted)}
+  .btn{appearance:none;border:0;border-radius:12px;padding:14px 18px;font:600 16px "IBM Plex Sans",sans-serif;cursor:pointer;background:var(--cyan);color:#062022;width:100%}
+  .btn:active{transform:scale(.99)}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+  .tag{display:inline-block;font:600 11px "IBM Plex Mono",monospace;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);margin-bottom:6px}
+
+  /* top bar */
+  .topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,20,.94);backdrop-filter:blur(6px);padding:10px 0 10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+  .toprow{display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:8px}
+  .stab{margin-top:8px}
+  .stabbar{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+  .stabfill{height:100%;width:50%;transition:width .6s ease, background .6s}
+  .stablabel{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+
+  /* monitor */
+  .monitor{background:#05080a;border:1px solid #1d2a33;border-radius:16px;padding:12px;margin-bottom:14px}
+  canvas{width:100%;height:56px;display:block}
+  .vitals{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+  .v{background:#0b1217;border-radius:10px;padding:8px 6px;text-align:center;border:1px solid #142029}
+  .v .k{font:600 10px "IBM Plex Mono",monospace;color:var(--muted);letter-spacing:.5px}
+  .v .n{font:600 20px "IBM Plex Mono",monospace;margin-top:2px;transition:color .4s}
+  .v .s{font:400 10px "IBM Plex Mono",monospace;color:var(--muted)}
+  .extra{font:400 12px "IBM Plex Mono",monospace;color:var(--amber);margin-top:8px;min-height:16px}
+  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
+  @media (max-width:480px){ .vitals{grid-template-columns:repeat(3,1fr)} .v .n{font-size:18px} }
+
+  .status{display:inline-flex;align-items:center;gap:6px;font:600 12px "IBM Plex Mono",monospace;padding:4px 8px;border-radius:20px;margin-bottom:8px}
+  .status.up{background:rgba(61,220,132,.12);color:var(--green)}
+  .status.down{background:rgba(255,90,95,.12);color:var(--red)}
+
+  .opts{display:flex;flex-direction:column;gap:10px}
+  .opt{text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:14px;font:500 15px/1.45 "IBM Plex Sans",sans-serif;cursor:pointer;display:flex;gap:12px;align-items:flex-start}
+  .opt:hover{border-color:#3a4c58}
+  .opt .letter{flex:none;width:26px;height:26px;border-radius:8px;background:#0b1217;display:grid;place-items:center;font:600 13px "IBM Plex Mono",monospace;color:var(--cyan)}
+  .opt[disabled]{cursor:default;opacity:.45}
+  .opt.chosen{opacity:1;border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}
+
+  .outcome{border-radius:14px;padding:14px;margin-top:14px;border:1px solid;animation:pop .35s ease}
+  .outcome.g{background:rgba(61,220,132,.08);border-color:rgba(61,220,132,.4)}
+  .outcome.a{background:rgba(255,181,71,.08);border-color:rgba(255,181,71,.4)}
+  .outcome.r{background:rgba(255,90,95,.09);border-color:rgba(255,90,95,.45)}
+  .delta{font:600 14px "IBM Plex Mono",monospace;margin-bottom:6px}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .hidden{display:none !important}
+  .ending{text-align:center;padding:24px 16px}
+  .ending .big{font-size:42px;margin-bottom:6px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0}
+  .badge{font:600 12px "IBM Plex Mono",monospace;padding:6px 10px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .badge.on{border-color:var(--cyan);color:var(--cyan);background:rgba(79,227,214,.08)}
+  .dstage{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin-bottom:16px}
+  .dstage.best{border-color:var(--green)} .dstage.sub{border-color:var(--amber)} .dstage.harm{border-color:var(--red)}
+  .dstage .t{font-weight:600;margin-bottom:4px}
+  .pill{font:600 10px "IBM Plex Mono",monospace;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
+  .pill.best{background:rgba(61,220,132,.15);color:var(--green)}
+  .pill.sub{background:rgba(255,181,71,.15);color:var(--amber)}
+  .pill.harm{background:rgba(255,90,95,.15);color:var(--red)}
+  .small{font-size:13px}
+  .flat{animation:flash 1s steps(2) infinite}
+  @keyframes flash{50%{opacity:.35}}
+  ul{padding-left:20px;margin:6px 0 0} li{margin-bottom:6px;line-height:1.5}
+  body{background:radial-gradient(900px 500px at 50% -10%, #12303a 0%, transparent 60%), var(--bg)}
+
+  /* patient scene */
+  .scene{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-bottom:14px;background:#16242d;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  .scene svg{display:block;width:100%;height:auto}
+  .topbar .scene{margin:10px 0 0;border-radius:14px}
+  .topbar .scene svg{height:150px}
+  .topbar .chip{top:7px;font-size:10px}
+  .outcome{scroll-margin-top:280px}
+  .leftcol{display:contents}
+  @media (min-width:700px) and (max-width:899px){ #game .topbar .scene svg{height:240px} .outcome{scroll-margin-top:380px} }
+  .chip{position:absolute;top:10px;font:600 11px "IBM Plex Mono",monospace;padding:4px 9px;border-radius:20px;background:rgba(5,8,10,.65);backdrop-filter:blur(4px);transition:color .5s}
+  .chip.left{left:10px;color:var(--muted)} .chip.right{right:10px}
+  .alarm{position:absolute;inset:0;background:radial-gradient(circle at 50% 0, rgba(255,60,60,.45), transparent 65%);opacity:0;pointer-events:none}
+  .alarm.on{animation:alarm 1s infinite}
+  @keyframes alarm{50%{opacity:1}}
+  .scene.flash-g{animation:fg .9s ease}
+  .scene.flash-r{animation:fr .9s ease}
+  @keyframes fg{30%{box-shadow:0 0 0 3px rgba(61,220,132,.85),0 0 40px rgba(61,220,132,.45)}}
+  @keyframes fr{30%{box-shadow:0 0 0 3px rgba(255,90,95,.9),0 0 40px rgba(255,90,95,.5)}}
+  .skin{fill:var(--skin,#ecbfa2);transition:fill .9s ease}
+  #chest{transform-box:fill-box;transform-origin:50% 100%;animation:breathe 2.4s ease-in-out infinite}
+  #headBob{animation:bob 2.4s ease-in-out infinite}
+  @keyframes breathe{50%{transform:scaleY(1.04) scaleX(1.012)}}
+  @keyframes bob{50%{transform:translateY(-1.4px)}}
+  .blink{transform-box:fill-box;transform-origin:center;animation:blink 4.5s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  .shiver{animation:shiver .13s linear infinite}
+  @keyframes shiver{25%{transform:translateX(.9px)}75%{transform:translateX(-.9px)}}
+  .drip{animation:drip 1.6s ease-in infinite}
+  @keyframes drip{0%{transform:translateY(0);opacity:0}15%{opacity:1}90%{transform:translateY(9px);opacity:1}100%{transform:translateY(10px);opacity:0}}
+  .sweatdrop{animation:sweat 2.2s ease-in infinite}
+  .sweatdrop.d2{animation-delay:1.1s}
+  @keyframes sweat{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(14px);opacity:0}}
+  .floater{transform-box:fill-box;animation:floatUp 1.5s ease-out forwards}
+  @keyframes floatUp{from{transform:translateY(0) scale(.6);opacity:0}20%{opacity:1;transform:translateY(-6px) scale(1)}to{transform:translateY(-46px) scale(1.1);opacity:0}}
+  .nod{animation:nod .45s ease 2}
+  @keyframes nod{50%{transform:translateY(3px)}}
+  .wince{animation:shake .35s ease 2}
+  @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+  .minhand{transform-origin:0 0;animation:spin 60s linear infinite}
+  .hrhand{transform-origin:0 0;animation:spin 720s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* iPad / wide screens */
+  @media (min-width:900px){
+    .wrap{max-width:1180px}
+    #start,#end,#arrest{max-width:760px;margin:0 auto}
+    #game:not(.hidden){display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+    #game .leftcol{display:block;position:sticky;top:calc(10px + env(safe-area-inset-top))}
+    #game .topbar{position:static;border-bottom:0;margin-bottom:12px}
+    .outcome{scroll-margin-top:20px}
+    #game .topbar .scene svg{height:300px}
+    .opt{font-size:16px;padding:16px}
+    h2{font-size:21px}
+    p{font-size:16.5px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="scene" class="scene">
+    <svg viewBox="0 0 400 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Margaret in her hospital bed">
+      <defs>
+        <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2a34"/><stop offset="1" stop-color="#223743"/></linearGradient>
+        <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b4f8c"/><stop offset=".6" stop-color="#c86f6a"/><stop offset="1" stop-color="#f3a86b"/></linearGradient>
+        <radialGradient id="gLamp" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#ffe2a8" stop-opacity=".32"/><stop offset="1" stop-color="#ffe2a8" stop-opacity="0"/></radialGradient>
+        <pattern id="pGown" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#8fbfe0"/><circle cx="2" cy="2" r="1" fill="#6fa6cf"/><circle cx="6" cy="6" r="1" fill="#6fa6cf"/></pattern>
+      </defs>
+      <rect width="400" height="230" fill="url(#gWall)"/>
+      <rect y="198" width="400" height="32" fill="#121d24"/>
+      <line x1="0" y1="198" x2="400" y2="198" stroke="#2b3d48" stroke-width="2"/>
+      <!-- window -->
+      <g transform="translate(26,26)">
+        <rect width="88" height="74" rx="4" fill="url(#gSky)"/>
+        <circle cx="62" cy="56" r="11" fill="#ffd38a" opacity=".9"/>
+        <path d="M0 60 L12 54 L12 46 L20 46 L20 56 L32 50 L40 50 L40 42 L48 42 L48 54 L60 52 L74 56 L74 48 L82 48 L82 54 L88 52 L88 74 L0 74Z" fill="#2a3550" opacity=".9"/>
+        <rect width="88" height="74" rx="4" fill="none" stroke="#33495a" stroke-width="4"/>
+        <line x1="44" y1="0" x2="44" y2="74" stroke="#33495a" stroke-width="3"/>
+        <line x1="0" y1="37" x2="88" y2="37" stroke="#33495a" stroke-width="3"/>
+      </g>
+      <line x1="10" y1="18" x2="124" y2="18" stroke="#5a6b76" stroke-width="2"/>
+      <path d="M14 18 Q22 64 16 112 L34 112 Q28 64 36 18Z" fill="#3c6f78"/>
+      <!-- lamp -->
+      <ellipse cx="200" cy="34" rx="130" ry="100" fill="url(#gLamp)"/>
+      <rect x="178" y="28" width="44" height="6" rx="3" fill="#cfd8de"/>
+      <!-- clock -->
+      <g transform="translate(72,130)">
+        <circle r="13" fill="#e8edf0" stroke="#5a6b76" stroke-width="2"/>
+        <line class="hrhand" x1="0" y1="0" x2="0" y2="-6" stroke="#22303a" stroke-width="2" stroke-linecap="round"/>
+        <line class="minhand" x1="0" y1="0" x2="0" y2="-9.5" stroke="#22303a" stroke-width="1.4" stroke-linecap="round"/>
+      </g>
+      <!-- bedside table -->
+      <rect x="44" y="160" width="56" height="40" rx="4" fill="#3a5160"/>
+      <rect x="40" y="156" width="64" height="6" rx="3" fill="#4b6575"/>
+      <line x1="50" y1="178" x2="94" y2="178" stroke="#2f4350" stroke-width="2"/>
+      <path d="M54 156 L56 142 L67 142 L69 156Z" fill="#cfe6f2" opacity=".8"/>
+      <g stroke="#5c9a63" stroke-width="1.6" fill="none"><path d="M85 142 Q82 132 78 125"/><path d="M85 142 Q86 130 86 121"/><path d="M86 142 Q90 134 94 127"/></g>
+      <circle cx="78" cy="124" r="4.5" fill="#ff8fab"/><circle cx="86" cy="120" r="4.5" fill="#ffd166"/><circle cx="94" cy="126" r="4.5" fill="#f78c6b"/>
+      <circle cx="78" cy="124" r="1.6" fill="#fff3c4"/><circle cx="86" cy="120" r="1.6" fill="#fff"/><circle cx="94" cy="126" r="1.6" fill="#fff3c4"/>
+      <rect x="80" y="140" width="11" height="16" rx="3" fill="#7fb7c9"/>
+      <!-- IV pole -->
+      <line x1="338" y1="32" x2="338" y2="198" stroke="#8796a0" stroke-width="3"/>
+      <line x1="322" y1="34" x2="354" y2="34" stroke="#8796a0" stroke-width="3" stroke-linecap="round"/>
+      <line x1="324" y1="198" x2="352" y2="198" stroke="#8796a0" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="325" cy="202" r="2.5" fill="#56656e"/><circle cx="351" cy="202" r="2.5" fill="#56656e"/>
+      <rect x="327" y="38" width="22" height="34" rx="6" fill="rgba(210,235,255,.22)" stroke="#a8c5d6" stroke-width="1.2"/>
+      <rect x="329" y="52" width="18" height="18" rx="4" fill="rgba(120,200,255,.45)"/>
+      <rect x="331" y="42" width="14" height="6" rx="1" fill="#e9f2f7" opacity=".8"/>
+      <rect x="334" y="74" width="8" height="14" rx="2" fill="rgba(210,235,255,.22)" stroke="#a8c5d6"/>
+      <circle class="drip" cx="338" cy="77" r="1.6" fill="#8fd3ff"/>
+      <path d="M338 88 Q340 150 300 168 Q270 178 236 188" fill="none" stroke="rgba(210,235,255,.55)" stroke-width="1.4"/>
+      <!-- bed head -->
+      <rect x="128" y="66" width="144" height="100" rx="16" fill="#2f4654"/>
+      <rect x="136" y="74" width="128" height="84" rx="12" fill="#36505f"/>
+      <ellipse cx="200" cy="112" rx="64" ry="30" fill="#e8edf1"/>
+      <!-- body -->
+      <path id="chest" d="M148 204 L148 164 Q150 140 178 134 L222 134 Q250 140 252 164 L252 204 Z" fill="url(#pGown)"/>
+      <rect class="skin" x="191" y="118" width="18" height="20" rx="6"/>
+      <path d="M186 135 Q200 146 214 135" fill="none" stroke="#6fa6cf" stroke-width="2"/>
+      <g id="headWrap"><g id="headShiver"><g id="headBob">
+        <g transform="translate(200,100)">
+          <ellipse cx="0" cy="-2" rx="31" ry="33" fill="#c9cdd3"/>
+          <circle cx="0" cy="-34" r="12" fill="#c2c6cc"/>
+          <ellipse class="skin" cx="-26" cy="2" rx="5" ry="8"/>
+          <ellipse class="skin" cx="26" cy="2" rx="5" ry="8"/>
+          <ellipse class="skin" cx="0" cy="2" rx="25" ry="29"/>
+          <path d="M-26 -6 Q-25 -31 0 -31 Q25 -31 26 -6 Q20 -21 4 -22 Q-4 -15 -16 -19 Q-23 -15 -26 -6Z" fill="#d9dde2"/>
+          <ellipse id="cheekL" cx="-14" cy="9" rx="6" ry="3.5" fill="#ff8b8b" opacity=".4"/>
+          <ellipse id="cheekR" cx="14" cy="9" rx="6" ry="3.5" fill="#ff8b8b" opacity=".4"/>
+          <g id="eyesOpen">
+            <g transform="translate(-10,-1)"><g class="eyeS"><g class="blink"><ellipse rx="3" ry="3.6" fill="#2b2f36"/><circle cx="1" cy="-1.3" r="1" fill="#fff"/></g></g></g>
+            <g transform="translate(10,-1)"><g class="eyeS"><g class="blink"><ellipse rx="3" ry="3.6" fill="#2b2f36"/><circle cx="1" cy="-1.3" r="1" fill="#fff"/></g></g></g>
+          </g>
+          <g id="eyesClosed" stroke="#5b4a44" stroke-width="1.6" fill="none" stroke-linecap="round" style="display:none"><path d="M-14 -1 Q-10 1.5 -6 -1"/><path d="M6 -1 Q10 1.5 14 -1"/></g>
+          <g id="eyesJoy" stroke="#2b2f36" stroke-width="1.8" fill="none" stroke-linecap="round" style="display:none"><path d="M-14 0 Q-10 -5 -6 0"/><path d="M6 0 Q10 -5 14 0"/></g>
+          <g id="eyesSqueeze" stroke="#2b2f36" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M-14 -4 L-7 -1 L-14 2"/><path d="M14 -4 L7 -1 L14 2"/></g>
+          <g stroke="#8a6f58" stroke-width="1.5" fill="rgba(255,255,255,.07)">
+            <circle cx="-10" cy="-1" r="7.5"/><circle cx="10" cy="-1" r="7.5"/>
+            <path d="M-2.5 -2 Q0 -4 2.5 -2" fill="none"/><path d="M-17.5 -2 L-25 -4" fill="none"/><path d="M17.5 -2 L25 -4" fill="none"/>
+          </g>
+          <path id="browL" stroke="#9aa0a8" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path id="browR" stroke="#9aa0a8" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M0 3 Q-3 9 1 10" stroke="#c8957a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path id="mouth" stroke="#9b4b4b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path id="cannula" d="M-27 8 Q-14 12 -3 9.5 M3 9.5 Q14 12 27 8" stroke="#d6eef9" stroke-width="1.6" fill="none" style="display:none"/>
+          <g id="sweat" style="display:none">
+            <path class="sweatdrop" d="M-20 -16 q-2.2 4.5 0 5.5 q2.2 -1 0 -5.5Z" fill="#a8dcff"/>
+            <path class="sweatdrop d2" d="M21 -12 q-2.2 4.5 0 5.5 q2.2 -1 0 -5.5Z" fill="#a8dcff"/>
+          </g>
+        </g>
+      </g></g></g>
+      <!-- blanket -->
+      <path d="M114 178 Q200 164 286 178 L290 214 Q200 222 110 214 Z" fill="#3c8c90"/>
+      <path d="M118 187 Q200 175 282 187" stroke="#5fb0b2" stroke-width="2" fill="none"/>
+      <!-- arms -->
+      <path d="M154 156 Q144 178 166 188" stroke="#8fbfe0" stroke-width="13" fill="none" stroke-linecap="round"/>
+      <path d="M246 156 Q256 178 234 188" stroke="#8fbfe0" stroke-width="13" fill="none" stroke-linecap="round"/>
+      <circle class="skin" cx="171" cy="190" r="7"/>
+      <circle class="skin" cx="229" cy="190" r="7"/>
+      <rect x="225" y="186" width="8" height="5" rx="1" fill="#f4f7f9" opacity=".9"/>
+      <!-- bed frame -->
+      <rect x="104" y="212" width="192" height="8" rx="3" fill="#4a606d"/>
+      <line x1="114" y1="220" x2="114" y2="229" stroke="#4a606d" stroke-width="4"/>
+      <line x1="286" y1="220" x2="286" y2="229" stroke="#4a606d" stroke-width="4"/>
+      <g id="fx"></g>
+    </svg>
+    <div class="chip left">Margaret E. · Bay 4</div>
+    <div class="chip right" id="moodChip">Unwell</div>
+    <div class="alarm" id="alarm"></div>
+  </div>
+
+  <!-- START -->
+  <section id="start">
+    <div class="tag">Clinical simulation · 8 decisions</div>
+    <h1>Code Sepsis</h1>
+    <p class="muted">A branching urosepsis case for medical students. Your choices make the patient better or worse.</p>
+    <div id="slot-start"></div>
+    <div class="card">
+      <div class="tag">Arriving now</div>
+      <p><strong>Margaret Ellis, 78</strong>, brought in by ambulance from her residential home. Staff say she's had 2 days of burning and frequency passing urine. Today she's drowsy and muddled (normally chatty and orientated), shivering, and holding her left side.</p>
+      <p class="small muted" style="margin:0">PMH: type 2 diabetes (metformin), hypertension (ramipril), CKD 3a (baseline creatinine 110). NKDA. Weight 60 kg. Exam: dry mucous membranes, cap refill 4 s, left renal angle tenderness. Glucose 14.2.</p>
+    </div>
+    <div class="card small">
+      <div class="tag">How to play</div>
+      <ul>
+        <li>Your <strong>Stability Score</strong> starts at 5/10. Good decisions raise it; poor ones drop it.</li>
+        <li>If it hits 0, the patient arrests.</li>
+        <li>Delays cost time on the clock, and time matters in sepsis.</li>
+        <li>Teaching points are revealed in the debrief at the end.</li>
+      </ul>
+    </div>
+    <button class="btn" id="startBtn">Start shift</button>
+    <p class="small muted" style="margin-top:14px">For education only. Based on UK practice (NEWS2, Sepsis Six, NICE NG51). Follow your local trust guidelines for doses and antibiotic choice.</p>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="hidden">
+    <div class="leftcol">
+    <div class="topbar">
+      <div class="toprow mono">
+        <span id="stageLbl">Stage 1/8</span>
+        <span id="clockLbl">T+ 0 min</span>
+      </div>
+      <div class="stab">
+        <div class="stablabel"><span>Stability</span><span class="mono" id="scoreLbl">5/10</span></div>
+        <div class="stabbar"><div class="stabfill" id="stabFill"></div></div>
+      </div>
+      <div id="slot-game"></div>
+    </div>
+
+    <div class="monitor">
+      <canvas id="ecg" height="56"></canvas>
+      <div class="vitals">
+        <div class="v"><div class="k">HR</div><div class="n" id="vHr">--</div><div class="s">bpm</div></div>
+        <div class="v"><div class="k">BP</div><div class="n" id="vBp" style="font-size:17px">--</div><div class="s" id="vMap">MAP --</div></div>
+        <div class="v"><div class="k">RR</div><div class="n" id="vRr">--</div><div class="s">/min</div></div>
+        <div class="v"><div class="k">SpO₂</div><div class="n" id="vSp">--</div><div class="s">%</div></div>
+        <div class="v"><div class="k">TEMP</div><div class="n" id="vT">--</div><div class="s">°C</div></div>
+      </div>
+      <div class="extra" id="vExtra"></div>
+    </div>
+    </div>
+
+    <div class="card">
+      <div class="tag" id="stageTitle"></div>
+      <div id="statusPill"></div>
+      <p id="stageText"></p>
+      <h2 id="prompt"></h2>
+      <div class="opts" id="opts"></div>
+      <div id="outcomeBox"></div>
+    </div>
+  </section>
+
+  <!-- ARREST -->
+  <section id="arrest" class="hidden">
+    <div id="slot-arrest"></div>
+    <div class="monitor" style="text-align:center;padding:28px 12px">
+      <div class="mono bad flat" style="font-size:22px;font-weight:600">CARDIAC ARREST</div>
+      <p class="muted" style="margin-top:12px">Margaret has lost cardiac output. The crash team is called.</p>
+    </div>
+    <button class="btn" id="toDebrief">See debrief</button>
+  </section>
+
+  <!-- END -->
+  <section id="end" class="hidden">
+    <div id="slot-end"></div>
+    <div class="card ending">
+      <div class="big" id="endIcon"></div>
+      <h1 id="endTitle"></h1>
+      <p class="muted" id="endText"></p>
+      <div class="mono" id="endScore" style="font-size:14px"></div>
+      <div class="badges" id="badges"></div>
+    </div>
+    <div class="card">
+      <div class="tag">Debrief</div>
+      <div id="debrief"></div>
+    </div>
+    <div class="card">
+      <div class="tag">Core learning points</div>
+      <ul>
+        <li>Spot sepsis early with NEWS2 and red flags. New confusion in an older adult isn't “just a UTI”.</li>
+        <li>Sepsis Six within the hour: oxygen, cultures, IV antibiotics, fluids, lactate, urine output.</li>
+        <li>Fluids in boluses with reassessment; vasopressors when fluid alone doesn't restore pressure.</li>
+        <li>Always look for a source to drain. An obstructed, infected kidney is an emergency.</li>
+        <li>Review the drug chart: sick-day rules and kidney-adjusted dosing.</li>
+        <li>Narrow antibiotics once cultures are back.</li>
+      </ul>
+    </div>
+    <button class="btn" id="restartBtn">Play again</button>
+  </section>
+
+</div>
+
+<script>
+const STAGES = [
+  { title:"Stage 1 · Recognition", time:0,
+    open:{ text:"You're the FY1 in ED. Margaret is on a trolley in majors. The nurse hands you her obs chart: NEWS2 13.",
+      obs:{hr:118,sys:92,dia:54,rr:26,spo2:93,temp:38.9,extra:"NEWS2 13 · new confusion"} },
+    prompt:"What do you do first?",
+    options:[
+      {tier:"best", text:"Recognise high-risk sepsis (NEWS2 13, new confusion, low BP), call the registrar now and start the Sepsis Six",
+       out:"Registrar arrives in 5 minutes. The team is mobilised, oxygen goes on and cannulation starts.",
+       obs:{hr:114,sys:94,dia:56,rr:24,spo2:95,extra:"Senior at bedside · Sepsis Six started"}},
+      {tier:"sub", text:"Send a urine dip and MSU, recheck obs in an hour",
+       out:"Dip shows nitrites and leucocytes, but an hour has been lost. She's getting worse.",
+       obs:{hr:126,sys:86,dia:50,rr:28,spo2:92,temp:39.1,extra:"Urine dip: nitrites +, leucocytes +++"}},
+      {tier:"harm", text:"Put the confusion down to “just a UTI in an older lady”, prescribe oral nitrofurantoin and arrange return to the home",
+       out:"While waiting for transport she becomes unresponsive. The nurse puts out an emergency call.",
+       obs:{hr:134,sys:78,dia:40,rr:30,spo2:90,temp:39.3,extra:"Responds to pain only"}}
+    ],
+    debrief:"NEWS2 ≥7 or any red-flag criterion = high-risk sepsis needing senior review and treatment within the hour. Nitrofurantoin gives no useful blood levels and is unsuitable for systemic infection or reduced kidney function."
+  },
+  { title:"Stage 2 · Oxygen and fluids", time:10,
+    imp:{ text:"The registrar is at the bedside. She's peripherally shut down: cap refill 4 s.",
+      obs:{hr:114,sys:92,dia:54,rr:24,spo2:93,temp:38.9,extra:"Cap refill 4 s"} },
+    det:{ text:"She's getting worse. Her knees are starting to mottle.",
+      obs:{hr:128,sys:84,dia:48,rr:28,spo2:91,temp:39.1,extra:"Mottling at knees"} },
+    prompt:"What's your immediate resuscitation?",
+    options:[
+      {tier:"best", text:"Oxygen to target SpO₂ 94–98%, two large-bore cannulas, 500 ml crystalloid bolus over 15 min, then reassess",
+       out:"She responds to the bolus. Cap refill improves to 3 s.",
+       obs:{hr:108,sys:102,dia:60,rr:22,spo2:96,temp:38.8,extra:"500 ml given · cap refill 3 s"}},
+      {tier:"sub", text:"Start 1 L 0.9% saline as maintenance over 8 hours",
+       out:"No real change after 30 minutes. Her blood pressure drifts down.",
+       obs:{hr:122,sys:88,dia:50,rr:26,spo2:94,temp:39.0,extra:"Maintenance running · no response"}},
+      {tier:"harm", text:"Hold fluids because of her age and CKD (“risk of overload”), give furosemide for low urine output",
+       out:"Her pressure falls further and urine output stops.",
+       obs:{hr:134,sys:76,dia:42,rr:30,spo2:92,temp:39.2,extra:"Anuric"}}
+    ],
+    debrief:"Give fluid in boluses and reassess after each. Fear of overload shouldn't stop initial resuscitation in a hypovolaemic septic patient; diuretics worsen pre-renal AKI."
+  },
+  { title:"Stage 3 · Cultures and antibiotics", time:20,
+    imp:{ text:"Bolus in, cannulas in, bloods drawn. She's a little brighter.",
+      obs:{hr:106,sys:102,dia:60,rr:22,spo2:96,temp:38.8,extra:"Bloods drawn"} },
+    det:{ text:"She's rigoring on the trolley.",
+      obs:{hr:126,sys:80,dia:46,rr:28,spo2:93,temp:39.4,extra:"Rigors"} },
+    prompt:"How do you handle cultures and antibiotics?",
+    options:[
+      {tier:"best", text:"Take blood cultures and send urine for culture, then give IV broad-spectrum antibiotics per the local urosepsis guideline within the hour",
+       out:"Antibiotics are in at 40 minutes. Cultures are on their way to the lab.",
+       obs:{hr:104,sys:100,dia:58,rr:22,spo2:96,temp:38.7,extra:"IV antibiotics given · cultures sent"}},
+      {tier:"sub", text:"Skip cultures to save time and give the IV antibiotic straight away",
+       out:"Antibiotics are in fast, but there'll be nothing to tailor treatment to later.",
+       obs:{hr:106,sys:98,dia:58,rr:22,spo2:96,temp:38.7,extra:"IV antibiotics given · no cultures"}, flag:"noCultures"},
+      {tier:"harm", text:"Wait for the urine culture result so you can pick the “right” antibiotic",
+       out:"Culture takes 24–48 hours. Two hours in, she's hypotensive and spiking with no antibiotic on board.",
+       obs:{hr:132,sys:78,dia:44,rr:30,spo2:92,temp:39.8,extra:"No antibiotics given"}}
+    ],
+    debrief:"In high-risk sepsis, give IV antibiotics within 1 hour. Take cultures first if it won't cause delay, as they guide later de-escalation. Choice of agent follows local guidance."
+  },
+  { title:"Stage 4 · Lactate and monitoring", time:45,
+    imp:{ text:"Venous gas and bloods are back. After 1 L in total she's more alert.",
+      obs:{hr:104,sys:98,dia:58,rr:22,spo2:96,temp:38.6,extra:"Lactate 4.6 · pH 7.29 · Cr 210 · WCC 19 · CRP 240"} },
+    det:{ text:"Venous gas and bloods are back. She's drowsier, GCS 13.",
+      obs:{hr:124,sys:82,dia:46,rr:28,spo2:93,temp:39.2,extra:"Lactate 5.8 · pH 7.24 · Cr 230 · WCC 21 · CRP 260"} },
+    prompt:"What do you do with these results?",
+    options:[
+      {tier:"best", text:"Treat lactate ≥4 as high risk: further 500 ml boluses with reassessment after each (towards ~30 ml/kg), catheter for hourly urine output, repeat lactate in 1–2 h, call critical care outreach",
+       out:"Outreach review at 60 minutes. Urine output is now being tracked and ICU is aware early.",
+       obs:{hr:110,sys:94,dia:56,rr:24,spo2:96,temp:38.5,extra:"UO 15 ml/hr · outreach reviewing"}},
+      {tier:"sub", text:"Note the lactate and plan to repeat it with tomorrow's routine bloods",
+       out:"The trend is missed and no one is measuring urine output.",
+       obs:{hr:118,sys:88,dia:52,rr:26,spo2:95,temp:38.8,extra:"No urine output monitoring"}},
+      {tier:"harm", text:"Give IV sodium bicarbonate to correct the acidosis and stop the fluids",
+       out:"The pH looks a bit better on paper, but her blood pressure falls. The cause hasn't been treated.",
+       obs:{hr:126,sys:78,dia:44,rr:30,spo2:93,temp:39.0,extra:"Fluids stopped"}}
+    ],
+    debrief:"Lactate reflects poor tissue perfusion. Act on it, trend it, and measure urine output hourly. Bicarbonate doesn't fix septic lactic acidosis."
+  },
+  { title:"Stage 5 · Refractory hypotension", time:75,
+    imp:{ text:"She's had about 2 L of crystalloid and is more alert, but her pressure won't hold.",
+      obs:{hr:112,sys:84,dia:50,rr:24,spo2:95,temp:38.4,extra:"~2 L given · MAP 61"} },
+    det:{ text:"She's had about 2 L of crystalloid. Mottled to the thighs, GCS 11.",
+      obs:{hr:132,sys:72,dia:42,rr:30,spo2:92,temp:39.0,extra:"~2 L given · lactate 6.2 · GCS 11"} },
+    prompt:"Blood pressure isn't holding despite fluid. Next step?",
+    options:[
+      {tier:"best", text:"Recognise septic shock, refer to ICU and start noradrenaline titrated to MAP ≥65 (peripherally short-term while lines are arranged)",
+       out:"MAP comes up on low-dose noradrenaline. ICU accepts her.",
+       obs:{hr:104,sys:96,dia:54,rr:22,spo2:96,temp:38.3,extra:"Noradrenaline running · ICU accepted"}},
+      {tier:"sub", text:"Keep giving fluid: a 4th and 5th litre",
+       out:"MAP creeps up, then crackles appear at both bases and her sats drop. Fluid overload.",
+       obs:{hr:116,sys:90,dia:52,rr:32,spo2:89,temp:38.6,extra:"Bilateral crackles"}},
+      {tier:"harm", text:"Accept MAP 58 as “probably her normal” and admit to a general ward",
+       out:"Two hours later the ward calls a peri-arrest.",
+       obs:{hr:140,sys:70,dia:38,rr:34,spo2:88,temp:39.2,extra:"Peri-arrest call"}}
+    ],
+    debrief:"Hypotension that persists after adequate fluid, needing vasopressors for MAP ≥65, is septic shock. Noradrenaline is first line; ICU input is needed early."
+  },
+  { title:"Stage 6 · Source control", time:120,
+    imp:{ text:"Bedside ultrasound then CT KUB: left hydronephrosis with a 7 mm stone at the left vesicoureteric junction. She's stable on low-dose noradrenaline.",
+      obs:{hr:102,sys:98,dia:56,rr:22,spo2:96,temp:38.3,extra:"CT: obstructed L kidney · NA 0.08 mcg/kg/min"} },
+    det:{ text:"Bedside ultrasound then CT KUB: left hydronephrosis with a 7 mm stone at the left vesicoureteric junction. Her noradrenaline requirement is climbing.",
+      obs:{hr:124,sys:84,dia:48,rr:28,spo2:93,temp:39.0,extra:"CT: obstructed L kidney · NA 0.3 · lactate 6"} },
+    prompt:"What does the scan change?",
+    options:[
+      {tier:"best", text:"Infected obstructed kidney = urological emergency. Urgent urology referral for decompression tonight (nephrostomy or ureteric stent); definitive stone treatment later",
+       out:"The nephrostomy drains pus. Noradrenaline is weaning within 6 hours.",
+       obs:{hr:96,sys:108,dia:62,rr:20,spo2:97,temp:38.0,extra:"Nephrostomy in · NA weaning"}},
+      {tier:"sub", text:"Continue antibiotics; urology to see her on the morning ward round",
+       out:"Pressor requirement creeps up overnight. Urology decompress the kidney next morning.",
+       obs:{hr:112,sys:92,dia:52,rr:24,spo2:95,temp:38.7,extra:"NA rising overnight"}},
+      {tier:"harm", text:"Treat as renal colic: tamsulosin, analgesia, wait for the stone to pass, book elective ureteroscopy",
+       out:"Shock worsens. Noradrenaline at maximum and vasopressin added.",
+       obs:{hr:138,sys:76,dia:40,rr:30,spo2:92,temp:39.4,extra:"NA max + vasopressin"}}
+    ],
+    debrief:"Antibiotics alone can't clear pus behind an obstruction. Always look for a source that needs draining."
+  },
+  { title:"Stage 7 · Medication safety and AKI", time:240,
+    imp:{ text:"Her drug chart still has metformin and ramipril on it, and she's had a dose of gentamicin. Creatinine has plateaued.",
+      obs:{hr:94,sys:110,dia:62,rr:20,spo2:97,temp:38.0,extra:"Cr 260 · UO 20 ml/hr · glucose 16"} },
+    det:{ text:"Her drug chart still has metformin and ramipril on it, and she's had a dose of gentamicin. Kidney function is worsening.",
+      obs:{hr:114,sys:92,dia:52,rr:24,spo2:95,temp:38.6,extra:"Cr 310 · K 6.0 · UO 10 ml/hr · glucose 18"} },
+    prompt:"Review her medications.",
+    options:[
+      {tier:"best", text:"Hold metformin and ramipril; dose gentamicin by weight and kidney function with levels per local protocol (or switch on microbiology advice); variable-rate insulin if glucose stays high",
+       out:"Kidney function stabilises. Glucose back in range.",
+       obs:{hr:90,sys:112,dia:64,rr:18,spo2:97,temp:37.8,extra:"Cr stable · glucose in range"}},
+      {tier:"sub", text:"Continue all regular medications at usual doses: “she takes them every day”",
+       out:"Creatinine climbs further. Lactate edges back up.",
+       obs:{hr:102,sys:100,dia:58,rr:22,spo2:96,temp:38.1,extra:"Cr 320 · lactate rising"}},
+      {tier:"harm", text:"Stop all antibiotics because of the AKI",
+       out:"Fever returns and noradrenaline has to go back up.",
+       obs:{hr:124,sys:88,dia:50,rr:26,spo2:94,temp:39.5,extra:"NA increased"}}
+    ],
+    debrief:"Sick-day rules: hold metformin, ACE inhibitors/ARBs, diuretics and NSAIDs in acute illness with AKI. Adjust nephrotoxic antibiotics, but don't stop treating the sepsis."
+  },
+  { title:"Stage 8 · De-escalation (Day 3, ICU)", time:null, timeLabel:"Day 3",
+    cultures:"Cultures: E. coli, sensitive to co-amoxiclav, ceftriaxone and ciprofloxacin; resistant to trimethoprim.",
+    noCultures:"No culture results: none were taken. You'll have to keep guessing.",
+    imp:{ text:"Off noradrenaline for 24 hours, afebrile, eating and drinking.",
+      obs:{hr:84,sys:124,dia:70,rr:18,spo2:97,temp:37.1,extra:"Off NA 24 h · lactate 1.4"} },
+    det:{ text:"Still on low-dose noradrenaline and slow to improve.",
+      obs:{hr:102,sys:104,dia:60,rr:22,spo2:95,temp:37.9,extra:"Low-dose NA · CRP 180"} },
+    prompt:"What now with the antibiotics?",
+    options:[
+      {tier:"best", text:"Narrow to the most targeted agent from the sensitivities, switch IV to oral once criteria are met, set a stop date, and plan definitive stone treatment",
+       out:"She steps down to the ward on day 4.",
+       obs:{hr:78,sys:128,dia:72,rr:16,spo2:98,temp:36.8,extra:"Oral antibiotics · stop date set"}},
+      {tier:"sub", text:"Escalate to meropenem “to be safe” and keep broad cover going",
+       out:"She recovers, but develops C. difficile diarrhoea on day 6, adding a week to her stay.",
+       obs:{hr:96,sys:118,dia:66,rr:18,spo2:97,temp:37.6,extra:"C. difficile positive"}},
+      {tier:"harm", text:"Stop antibiotics today because she looks well",
+       out:"Fever and rigors return on day 5. Back on IV antibiotics.",
+       obs:{hr:114,sys:98,dia:56,rr:24,spo2:95,temp:39.0,extra:"Rigors · restarted IV antibiotics"}}
+    ],
+    debrief:"Antimicrobial stewardship: use cultures to narrow, review daily and set a duration. Needless broad-spectrum use drives resistance and C. difficile."
+  }
+];
+
+const DELTA = {best:2, sub:-1, harm:-3};
+const PENALTY = {best:0, sub:15, harm:30};
+const TIERNAME = {best:"Best", sub:"Suboptimal", harm:"Harmful"};
+
+let S;
+const $ = id => document.getElementById(id);
+
+function reset(){
+  S = {stage:0, score:5, penalty:0, obs:{}, choices:[], flags:{}, abxTime:null, dead:false};
+}
+
+function show(id){
+  ["start","game","arrest","end"].forEach(s => $(s).classList.toggle("hidden", s!==id));
+  $("slot-"+id).appendChild($("scene"));
+  const svg = $("scene").querySelector("svg");
+  if(id==="game"){ svg.setAttribute("viewBox","20 18 360 190"); svg.setAttribute("preserveAspectRatio","xMidYMid slice"); }
+  else { svg.setAttribute("viewBox","0 0 400 230"); svg.removeAttribute("preserveAspectRatio"); }
+  window.scrollTo(0,0);
+}
+
+/* ---------- Patient expressions ---------- */
+const MOODS = {
+  happy:   {brow:[-11,-15.5,-12.5], mouth:"M-9 12 Q0 22 9 12 Z", fill:"#7a2e35", eyes:"open",   skin:"#f2c6a2", cheek:.6,  label:"Feeling better", col:"var(--green)"},
+  ok:      {brow:[-10,-13,-11],     mouth:"M-7 14 Q0 18.5 7 14", fill:"none",    eyes:"open",   skin:"#efc19d", cheek:.4,  label:"Comfortable",    col:"var(--green)"},
+  unwell:  {brow:[-10,-12,-14],     mouth:"M-6 15.5 Q0 14.2 6 15.5", fill:"none", eyes:"open",  skin:"#ebbea3", cheek:.55, label:"Unwell",         col:"var(--amber)"},
+  sad:     {brow:[-9,-11,-14.5],    mouth:"M-7 17.5 Q0 11 7 17.5", fill:"none",  eyes:"half",   skin:"#dcc6b8", cheek:.12, label:"Very unwell",    col:"var(--red)"},
+  critical:{brow:[-10,-10.5,-11],   mouth:"M-3 15 Q0 18.5 3 15 Q0 12.5 -3 15 Z", fill:"#5b3338", eyes:"closed", skin:"#cdc5c5", cheek:0, label:"Critical", col:"var(--red)"},
+  dead:    {brow:[-10,-10,-10],     mouth:"M-5 15.5 L5 15.5", fill:"none",       eyes:"closed", skin:"#b9bec6", cheek:0,   label:"No output",      col:"var(--red)"},
+  joy:     {brow:[-12,-16.5,-13],   mouth:"M-10 11 Q0 23 10 11 Z", fill:"#7a2e35", eyes:"joy"},
+  wince:   {brow:[-12.5,-10,-8],    mouth:"M-7 15 L-3.5 13 L0 15 L3.5 13 L7 15", fill:"none", eyes:"squeeze"}
+};
+let baseMood = "unwell", reactTimer = null;
+
+function moodFromScore(s){ return s>=8?"happy":s>=6?"ok":s>=4?"unwell":s>=2?"sad":"critical"; }
+
+function drawFace(name){
+  const m = MOODS[name];
+  const [o,mid,i] = m.brow;
+  $("browL").setAttribute("d", `M-16 ${o} Q-10.5 ${mid} -5 ${i}`);
+  $("browR").setAttribute("d", `M16 ${o} Q10.5 ${mid} 5 ${i}`);
+  $("mouth").setAttribute("d", m.mouth);
+  $("mouth").setAttribute("fill", m.fill);
+  ["Open","Closed","Joy","Squeeze"].forEach(k=>{
+    const want = m.eyes==="half" ? "open" : m.eyes;
+    $("eyes"+k).style.display = (k.toLowerCase()===want) ? "" : "none";
+  });
+  document.querySelectorAll(".eyeS").forEach(e=>e.setAttribute("transform", m.eyes==="half"?"scale(1,0.5)":""));
+}
+
+function setMood(name){
+  baseMood = name;
+  const m = MOODS[name];
+  drawFace(name);
+  $("scene").style.setProperty("--skin", m.skin);
+  $("cheekL").setAttribute("opacity", m.cheek);
+  $("cheekR").setAttribute("opacity", m.cheek);
+  $("moodChip").textContent = m.label;
+  $("moodChip").style.color = m.col;
+  $("alarm").classList.toggle("on", name==="critical" || name==="dead");
+  $("headBob").style.animationPlayState = name==="dead" ? "paused" : "running";
+  $("chest").style.animationPlayState = name==="dead" ? "paused" : "running";
+  bodySigns();
+}
+
+function bodySigns(){
+  const o = (S && S.obs) || {};
+  const temp = o.temp || 38.9, rr = o.rr || 26;
+  const still = baseMood==="dead";
+  $("sweat").style.display = (!still && temp>=38.5) ? "" : "none";
+  $("headShiver").classList.toggle("shiver", !still && baseMood!=="critical" && temp>=39.1);
+  const dur = (60/rr).toFixed(2)+"s";
+  $("chest").style.animationDuration = dur;
+  $("headBob").style.animationDuration = dur;
+}
+
+function floaters(good){
+  const fx = $("fx");
+  const glyphs = good ? ["♥","+","♥"] : ["!","✕","!"];
+  glyphs.forEach((g,i)=>{
+    const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t.setAttribute("x", 176 + i*22 + (Math.random()*8-4));
+    t.setAttribute("y", 66 + (i%2)*6);
+    t.setAttribute("text-anchor","middle");
+    t.setAttribute("font-size", good?"16":"15");
+    t.setAttribute("font-weight","700");
+    t.setAttribute("font-family","IBM Plex Mono, monospace");
+    t.setAttribute("fill", good ? "#3ddc84" : "#ff5a5f");
+    t.setAttribute("class","floater");
+    t.style.animationDelay = (i*0.12)+"s";
+    t.style.opacity = 0;
+    t.textContent = g;
+    fx.appendChild(t);
+    setTimeout(()=>t.remove(), 1900);
+  });
+}
+
+function react(good, nextMood){
+  clearTimeout(reactTimer);
+  drawFace(good ? "joy" : "wince");
+  const hw = $("headWrap"), sc = $("scene");
+  hw.classList.remove("nod","wince"); sc.classList.remove("flash-g","flash-r");
+  void hw.getBBox(); void sc.offsetWidth;
+  hw.classList.add(good ? "nod" : "wince");
+  sc.classList.add(good ? "flash-g" : "flash-r");
+  floaters(good);
+  reactTimer = setTimeout(()=>{ hw.classList.remove("nod","wince"); setMood(nextMood); }, 1100);
+}
+
+function cls(kind, v){
+  if(kind==="hr") return v>130||v<41?"bad":v>110?"warn":v>90?"warn":"ok";
+  if(kind==="sys") return v<=90?"bad":v<=100?"warn":"ok";
+  if(kind==="rr") return v>=25?"bad":v>=21?"warn":"ok";
+  if(kind==="spo2") return v<=91?"bad":v<=93?"warn":"ok";
+  if(kind==="temp") return v>=39.1?"bad":v>=38.1?"warn":"ok";
+  return "";
+}
+
+function setObs(o){
+  S.obs = Object.assign({}, S.obs, o);
+  const b = S.obs;
+  const map = Math.round((b.sys + 2*b.dia)/3);
+  const put = (id,val,c)=>{ const el=$(id); el.textContent=val; el.className="n "+c; };
+  put("vHr", b.hr, cls("hr",b.hr));
+  put("vBp", b.sys+"/"+b.dia, cls("sys",b.sys));
+  $("vMap").textContent = "MAP "+map;
+  $("vMap").className = "s "+(map<65?"bad":"");
+  put("vRr", b.rr, cls("rr",b.rr));
+  put("vSp", b.spo2, cls("spo2",b.spo2));
+  put("vT", b.temp.toFixed(1), cls("temp",b.temp));
+  $("vExtra").textContent = b.extra || "";
+  bodySigns();
+}
+
+function setScore(){
+  const s = S.score;
+  $("scoreLbl").textContent = s+"/10";
+  const f = $("stabFill");
+  f.style.width = (s*10)+"%";
+  f.style.background = s>=7?"var(--green)":s>=4?"var(--amber)":"var(--red)";
+}
+
+function clockText(st){
+  if(st.time===null) return st.timeLabel;
+  return "T+ "+(st.time+S.penalty)+" min";
+}
+
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+function renderStage(){
+  const st = STAGES[S.stage];
+  $("stageLbl").textContent = "Stage "+(S.stage+1)+"/"+STAGES.length;
+  $("clockLbl").textContent = clockText(st);
+  $("stageTitle").textContent = st.title;
+  let opener, statusHtml="";
+  if(st.open){ opener = st.open; }
+  else {
+    const improving = S.score>=5;
+    opener = improving ? st.imp : st.det;
+    statusHtml = improving
+      ? '<span class="status up">▲ Responding to treatment</span>'
+      : '<span class="status down">▼ Deteriorating</span>';
+  }
+  $("statusPill").innerHTML = statusHtml;
+  let text = opener.text;
+  if(st.cultures){
+    text = (S.flags.noCultures ? st.noCultures : st.cultures) + " " + text;
+  }
+  $("stageText").textContent = text;
+  $("prompt").textContent = st.prompt;
+  setObs(opener.obs);
+  $("cannula").style.display = S.stage>=1 ? "" : "none";
+  setMood(moodFromScore(S.score));
+  const box = $("opts"); box.innerHTML="";
+  $("outcomeBox").innerHTML="";
+  shuffle(st.options).forEach((opt,i)=>{
+    const b = document.createElement("button");
+    b.className="opt";
+    b.innerHTML = '<span class="letter">'+"ABC"[i]+'</span><span></span>';
+    b.lastChild.textContent = opt.text;
+    b.onclick = ()=>choose(opt,b);
+    box.appendChild(b);
+  });
+}
+
+function choose(opt, btn){
+  const st = STAGES[S.stage];
+  document.querySelectorAll(".opt").forEach(b=>{ b.disabled=true; });
+  btn.classList.add("chosen");
+  let d = DELTA[opt.tier];
+  let extraNote = "";
+  if(S.stage===2 && opt.tier!=="harm") S.abxTime = st.time + S.penalty + 20;
+  if(opt.flag) S.flags[opt.flag]=true;
+  if(S.stage===7 && S.flags.noCultures){ d -= 1; extraNote = " No cultures meant no sensitivities to guide you (−1)."; }
+  if(st.time!==null) S.penalty += PENALTY[opt.tier];
+  S.score = Math.max(0, Math.min(10, S.score + d));
+  S.choices.push({stage:S.stage, opt});
+  setObs(opt.obs);
+  setScore();
+  $("clockLbl").textContent = clockText(st);
+
+  react(d>0, S.score<=0 ? "dead" : moodFromScore(S.score));
+  const c = d>0?"g":d>=-1?"a":"r";
+  const label = d>0?"Patient improving":d>=-1?"Patient worsening":"Patient deteriorating fast";
+  const sign = d>0?"+"+d:String(d);
+  const last = S.stage===STAGES.length-1;
+  const dead = S.score<=0;
+  const box = $("outcomeBox");
+  box.innerHTML = '<div class="outcome '+c+'"><div class="delta">'+label+' · '+sign+' stability</div><p style="margin:0 0 12px"></p><button class="btn" id="nextBtn"></button></div>';
+  box.querySelector("p").textContent = opt.out + extraNote;
+  const nb = $("nextBtn");
+  nb.textContent = dead ? "Continue" : last ? "See outcome" : "Next decision →";
+  nb.onclick = ()=>{
+    if(dead){ S.dead=true; clearTimeout(reactTimer); setMood("dead"); show("arrest"); return; }
+    if(last){ finish(); return; }
+    S.stage++; renderStage(); window.scrollTo({top:0,behavior:"smooth"});
+  };
+  setTimeout(()=>box.scrollIntoView({behavior:"smooth",block:"nearest"}),50);
+}
+
+function finish(){
+  const s = S.score;
+  let icon,title,text;
+  if(S.dead || s<=3){ icon="✕"; title="Bad outcome"; text = S.dead ? "Margaret had a cardiac arrest. Look at where things went wrong below." : "Margaret has a cardiac arrest on ICU and doesn't survive. Look at where things went wrong below."; }
+  else if(s<=7){ icon="◐"; title="Survived, with harm"; text="She survives after 9 days in ICU, but her kidney function doesn't fully recover and she needs a care package review."; }
+  else { icon="✓"; title="Good outcome"; text="Margaret goes home to her care home on day 8, back to her usual self. Elective stone treatment is booked."; }
+  clearTimeout(reactTimer);
+  $("cannula").style.display = icon==="✓" ? "none" : "";
+  if(icon==="✓"){ S.obs.temp=36.8; S.obs.rr=16; setMood("happy"); [0,1400,2800].forEach(t=>setTimeout(()=>floaters(true),t)); }
+  else if(icon==="◐"){ setMood("ok"); }
+  else { S.dead=true; setMood("dead"); }
+  $("endIcon").textContent = icon;
+  $("endIcon").className = "big "+(icon==="✓"?"ok":icon==="◐"?"warn":"bad");
+  $("endTitle").textContent = title;
+  $("endText").textContent = text;
+  $("endScore").textContent = "Final stability "+s+"/10 · decisions made "+S.choices.length+"/8";
+
+  const pick = i => (S.choices.find(c=>c.stage===i)||{}).opt;
+  const golden = S.abxTime!==null && S.abxTime<=60;
+  const source = pick(5) && pick(5).tier==="best";
+  const steward = pick(7) && pick(7).tier==="best" && !S.flags.noCultures;
+  const perfect = S.choices.length===8 && S.choices.every(c=>c.opt.tier==="best");
+  $("badges").innerHTML =
+    badge("Golden Hour",golden)+badge("Source Hunter",source)+badge("Steward",steward)+badge("Flawless",perfect);
+
+  const deb = $("debrief"); deb.innerHTML="";
+  STAGES.forEach((st,i)=>{
+    const ch = pick(i);
+    const best = st.options.find(o=>o.tier==="best");
+    const div = document.createElement("div");
+    div.className = "dstage" + (ch ? " "+ch.tier : "");
+    let html = '<div class="t"></div>';
+    html += ch ? '<p class="small" style="margin:0 0 6px"><span class="muted">You chose:</span> <span class="c"></span><span class="pill '+ch.tier+'">'+TIERNAME[ch.tier]+'</span></p>'
+               : '<p class="small muted" style="margin:0 0 6px">Not reached</p>';
+    if(!ch || ch.tier!=="best") html += '<p class="small" style="margin:0 0 6px"><span class="muted">Best choice:</span> <span class="b"></span></p>';
+    html += '<p class="small" style="margin:0"><strong>Teaching point:</strong> <span class="d"></span></p>';
+    div.innerHTML = html;
+    div.querySelector(".t").textContent = st.title;
+    if(ch) div.querySelector(".c").textContent = ch.text+" ";
+    if(div.querySelector(".b")) div.querySelector(".b").textContent = best.text;
+    div.querySelector(".d").textContent = st.debrief;
+    deb.appendChild(div);
+  });
+  show("end");
+}
+function badge(n,on){ return '<span class="badge'+(on?' on':'')+'">'+(on?'★ ':'')+n+'</span>'; }
+
+/* ECG trace */
+const cv = $("ecg"), ctx = cv.getContext("2d");
+let x=0, phase=0, lastT=0;
+function resizeCv(){ const r = cv.getBoundingClientRect(); cv.width = Math.max(200, r.width*devicePixelRatio); cv.height = 56*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); x=0; ctx.clearRect(0,0,cv.width,cv.height); }
+function ecgY(p){
+  if(p<0.10) return 0;
+  if(p<0.16) return -4*Math.sin((p-0.10)/0.06*Math.PI);
+  if(p<0.22) return 0;
+  if(p<0.24) return 4;
+  if(p<0.27) return -22;
+  if(p<0.30) return 8;
+  if(p<0.40) return 0;
+  if(p<0.52) return -6*Math.sin((p-0.40)/0.12*Math.PI);
+  return 0;
+}
+let prevY=28;
+function tick(t){
+  const dt = Math.min(50, t-lastT); lastT=t;
+  const w = cv.width/devicePixelRatio, h=56;
+  const hr = (S && S.obs.hr) || 80;
+  const dead = S && S.dead;
+  phase += dt/1000 * hr/60;
+  if(phase>1) phase-=1;
+  const speed = 0.09*dt;
+  ctx.clearRect(x, 0, 14, h);
+  const y = h/2 + (dead?0:ecgY(phase));
+  ctx.strokeStyle = dead ? "#ff5a5f" : "#3ddc84";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, prevY); ctx.lineTo(x+speed, y); ctx.stroke();
+  prevY=y; x+=speed;
+  if(x>w){ x=0; }
+  requestAnimationFrame(tick);
+}
+
+$("startBtn").onclick = ()=>{ reset(); S.obs={}; setScore(); show("game"); resizeCv(); renderStage(); };
+$("toDebrief").onclick = finish;
+$("restartBtn").onclick = ()=>{ reset(); setScore(); show("game"); resizeCv(); renderStage(); };
+window.addEventListener("resize", resizeCv);
+reset();
+S.obs={hr:118,rr:26,temp:38.9};
+setMood("unwell");
+$("slot-start").appendChild($("scene"));
+requestAnimationFrame(t=>{lastT=t; requestAnimationFrame(tick);});
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
